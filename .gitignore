@@ -1,5 +1,7 @@
 package-lock.json
 config.json
+config.mimic.json
+config.soundbot.json
 tsconfig.tsbuildinfo
 recordings/*.ogg
 dist
