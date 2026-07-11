@@ -1,10 +1,10 @@
-import { createAudioResource, entersState, getVoiceConnection, joinVoiceChannel, VoiceConnection, VoiceConnectionStatus } from '@discordjs/voice';
-import { Client, CommandInteraction, GuildMember, Snowflake } from 'discord.js';
+import { createAudioPlayer, createAudioResource, entersState, getVoiceConnection, joinVoiceChannel, VoiceConnection, VoiceConnectionStatus } from '@discordjs/voice';
+import { ChatInputCommandInteraction, Client, GuildMember, MessageFlags } from 'discord.js';
 import { createListeningStream } from './createListeningStream';
 import * as fs from 'fs';
 
-export const defaultMimicDelay = 100;
-export const defaultMimicIntervalObj = {min: 30, max: 60};
+export const defaultMimicDelay = 10;
+export const defaultMimicIntervalObj = {min: 3, max: 6};
 export const rootPath = './recordings/';
 
 const cleanupOldRecordings = function() {
@@ -17,18 +17,18 @@ const cleanupOldRecordings = function() {
 	});
 }
 
-function initializeMimic(interaction: CommandInteraction, connection: VoiceConnection) {
-	const { createAudioPlayer } = require('@discordjs/voice');
+function initializeMimic(interaction: ChatInputCommandInteraction, connection: VoiceConnection) {
 	const player = createAudioPlayer();
 	
-	let mimicDelay = interaction.options.get('mimicDelay')?.value as number;
-	let mimicIntervalVal = interaction.options.get('mimicInterval')?.value as number;
-	let mimicUser = interaction.options.get('mimicUser')?.value;
+	let mimicDelay = interaction.options.get('mimicdelay')?.value as number;
+	let mimicIntervalVal = interaction.options.get('mimicinterval')?.value as number;
+	let mimicUser = interaction.options.get('mimicuser')?.value;
 
 	mimicDelay = mimicDelay ? mimicDelay : defaultMimicDelay;
-	let mimicInterval = mimicIntervalVal ? {min: mimicIntervalVal-20, max: mimicIntervalVal+20} : defaultMimicIntervalObj;
-	let intervalMimicSeconds = Math.floor(Math.random() * mimicInterval.min + (mimicInterval.max-mimicInterval.min));
-			
+	const mimicInterval = mimicIntervalVal ? {min: mimicIntervalVal-20, max: mimicIntervalVal+20} : defaultMimicIntervalObj;
+
+	const getNextIntervalSeconds = () => Math.floor(Math.random() * mimicInterval.min + (mimicInterval.max-mimicInterval.min));
+
 	if (connection) {
 		connection.subscribe(player);
 	}
@@ -36,11 +36,13 @@ function initializeMimic(interaction: CommandInteraction, connection: VoiceConne
 		console.log('Init Mimic - no connection found for player');
 	}
 
-	setTimeout(() => {
-		setInterval(() => {
+	const scheduleNextMimic = () => {
+		const nextInterval = getNextIntervalSeconds();
+		console.log(`Next mimicInterval scheduled for: ${nextInterval} seconds`);
+		setTimeout(() => {
 			if (connection) {
 				const userDirs = fs.readdirSync(rootPath);
-				let randoFileName = 'undefined';
+				let randoFileName = '';
 				let dirPath = null;
 
 				const randoUserDirIndex = Math.floor(Math.random()*userDirs.length);
@@ -48,22 +50,27 @@ function initializeMimic(interaction: CommandInteraction, connection: VoiceConne
 				const soundFiles = fs.readdirSync(dirPath);
 				const randoSoundIndex = Math.floor(Math.random()*soundFiles.length);
 
-				randoFileName = soundFiles[randoSoundIndex];
-
-				const resource = createAudioResource(dirPath + randoFileName);
-				console.log('Playing: ' + dirPath + randoFileName);
-				player.play(resource);
+				if (soundFiles[randoSoundIndex]) {
+					randoFileName = soundFiles[randoSoundIndex];
+					const resource = createAudioResource(dirPath + randoFileName);
+					console.log('Playing: ' + dirPath + randoFileName);
+					player.play(resource);
+				}
 			}
 			else {
 				console.log('Play Sound - no connection found');
 			}
-	
-		}, intervalMimicSeconds * 1000);
-	}, mimicDelay * 1000);
+
+			scheduleNextMimic();
+		}, nextInterval * 1000);
+	};
+
+	console.log(`Starting mimic playback with ${mimicDelay}s initial delay`);
+	setTimeout(scheduleNextMimic, mimicDelay * 1000);
 }
 
 async function join(
-	interaction: CommandInteraction,
+	interaction: ChatInputCommandInteraction,
 	client: Client,
 	connection?: VoiceConnection,
 ) {
@@ -76,23 +83,10 @@ async function join(
 			connection = joinVoiceChannel({
 				channelId: channel.id,
 				guildId: channel.guild.id,
+				adapterCreator: channel.guild.voiceAdapterCreator,
 				selfDeaf: false,
 				selfMute: true,
-				// @ts-expect-error Currently voice is built in mind with API v10 whereas discord.js v13 uses API v9.
-				adapterCreator: channel.guild.voiceAdapterCreator,
 			});
-			connection.on('stateChange', (oldState, newState) => {
-				const oldNetworking = Reflect.get(oldState, 'networking');
-				const newNetworking = Reflect.get(newState, 'networking');
-			  
-				const networkStateChangeHandler = (oldNetworkState: any, newNetworkState: any) => {
-				  const newUdp = Reflect.get(newNetworkState, 'udp');
-				  clearInterval(newUdp?.keepAliveInterval);
-				}
-			  
-				oldNetworking?.off('stateChange', networkStateChangeHandler);
-				newNetworking?.on('stateChange', networkStateChangeHandler);
-			  });
 		} else {
 			await interaction.followUp('Join a voice channel and then try that again!');
 			return;
@@ -100,7 +94,7 @@ async function join(
 	}
 
 	try {
-		await entersState(connection, VoiceConnectionStatus.Ready, 20e3);
+		await entersState(connection, VoiceConnectionStatus.Ready, 30e3);
 		const receiver = connection.receiver;
 
 		initializeMimic(interaction, connection);
@@ -111,38 +105,35 @@ async function join(
 				return;
 			}
 			
-			console.log('started speaking', +userId-308423748980310000);
+			console.log('started speaking', userId);
 			createListeningStream(receiver, userId, client.users.cache.get(userId));
 		});
 
-		//receiver.speaking.on('end', (userId) => {
-		//	console.log('Done Speaking', +userId-308423748980310000);
-		//});
+		await interaction.followUp('Ready!');
 	} catch (error) {
 		console.warn(error);
-		await interaction.followUp('Failed to join voice channel within 20 seconds, please try again later!');
+		connection.destroy();
+		await interaction.followUp('Failed to join voice channel within 30 seconds, please try again later!');
 	}
-
-	//await interaction.followUp('Ready!');
 }
 
 async function leave(
-	interaction: CommandInteraction,
+	interaction: ChatInputCommandInteraction,
 	_client: Client,
 	connection?: VoiceConnection,
 ) {
 	if (connection) {
 		connection.destroy();
-		await interaction.reply({ ephemeral: true, content: 'Left the channel!' });
+		await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Left the channel!' });
 	} else {
-		await interaction.reply({ ephemeral: true, content: 'Not playing in this server!' });
+		await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Not playing in this server!' });
 	}
 }
 
 export const interactionHandlers = new Map<
 	string,
 	(
-		interaction: CommandInteraction,
+		interaction: ChatInputCommandInteraction,
 		client: Client,
 		connection?: VoiceConnection,
 	) => Promise<void>

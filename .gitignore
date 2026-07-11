@@ -5,3 +5,4 @@ config.soundbot.json
 tsconfig.tsbuildinfo
 recordings/*.ogg
 dist
+node_modules

@@ -8,17 +8,17 @@ export const deploy = async (guild: Guild) => {
 			description: 'Joins the voice channel that you are in',
 			options: [
 				{
-					name: 'mimicDelay',
+					name: 'mimicdelay',
 					type: ApplicationCommandOptionType.Number,
 					description: 'Time to wait before saying anything',
 				},
 				{
-					name: 'mimicInterval',
+					name: 'mimicinterval',
 					type: ApplicationCommandOptionType.Number,
 					description: 'Time between saying things',
 				},
 				{
-					name: 'mimicUser',
+					name: 'mimicuser',
 					type: ApplicationCommandOptionType.User,
 					description: 'Only speak in the form of this user',
 				},

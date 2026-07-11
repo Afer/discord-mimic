@@ -8,20 +8,20 @@ import { rootPath } from './interactions';
 const fs = require('fs');
 
 function getDisplayName(userId: string, user?: User) {
-	return user ? `${user.username}_${user.discriminator}` : userId;
+	return user ? user.username : userId;
 }
 
 export function createListeningStream(receiver: VoiceReceiver, userId: string, user?: User) {
 	const opusStream = receiver.subscribe(userId, {
 		end: {
 			behavior: EndBehaviorType.AfterSilence,
-			duration: 100,
+			duration: 700,
 		},
 	});
 
 	const oggStream = new prism.opus.OggLogicalBitstream({
 		opusHead: new prism.opus.OpusHead({
-			channelCount: 2,
+			channelCount: 1,
 			sampleRate: 48000,
 		}),
 		pageSizeControl: {
@@ -29,7 +29,7 @@ export function createListeningStream(receiver: VoiceReceiver, userId: string, u
 		},
 	});
 
-	const directory = getDisplayName(userId, user).split('_')[0].split('.')[0];
+	const directory = getDisplayName(userId, user).split('_')[0]?.split('.')[0];
 	if (!fs.existsSync(rootPath + directory)) {
 		fs.mkdirSync(rootPath + directory);
 	}
@@ -41,23 +41,24 @@ export function createListeningStream(receiver: VoiceReceiver, userId: string, u
 	console.log(`👂 Started recording ${filename}`);
 
 	pipeline(opusStream, oggStream, out, (err) => {
-		if (err) {
-			console.warn(`❌ Error recording file ${filename} - ${err.message}`);
-		}
-		else {
-			const stats = fs.statSync(filename);
-			if (stats.size > 8000) {
-				console.log(`✅ Recorded ${filename}`);
+		try {
+			if (err) {
+				console.warn(`❌ Error recording file ${filename} - ${err.message}`);
 			}
 			else {
-				console.log(`😒 Recording too small`);
-				try {
-					fs.unlinkSync(filename);
+				const stats = fs.statSync(filename);
+				if (stats.size > 8000) {
+					console.log(`✅ Recorded ${filename}`);
 				}
-				catch(e) {
-					console.log('oops, failed to delete file');
+				else {
+					console.log(`😒 Recording too small`);
+					fs.unlinkSync(filename);
+
 				}
 			}
+		}
+		catch (e) {
+			console.log('oops, failed to delete file');
 		}
 	});
 }

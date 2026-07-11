@@ -1,0 +1,7 @@
+{
+	"name": "node-crc",
+	"version": "1.0.0",
+	"description": "Pure-JS shim providing the subset of node-crc's API that prism-media uses, avoiding the native Rust build.",
+	"main": "index.js",
+	"license": "MIT"
+}
