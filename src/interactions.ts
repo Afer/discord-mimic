@@ -3,8 +3,8 @@ import { ChatInputCommandInteraction, Client, GuildMember, MessageFlags } from '
 import { createListeningStream } from './createListeningStream';
 import * as fs from 'fs';
 
-export const defaultMimicDelay = 10;
-export const defaultMimicIntervalObj = {min: 3, max: 6};
+export const defaultMimicDelay = 100;
+export const defaultMimicIntervalObj = {min: 20, max: 40};
 export const rootPath = './recordings/';
 
 const cleanupOldRecordings = function() {

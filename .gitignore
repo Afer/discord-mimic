@@ -6,3 +6,4 @@ tsconfig.tsbuildinfo
 recordings/*.ogg
 dist
 node_modules
+recordings
